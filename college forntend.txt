@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Login</title>
+</head>
+<body>
+    <h1>Student Login</h1>
+    <form method="POST" action="/login">
+        <label for="student_id">Student ID:</label><br>
+        <input type="text" id="student_id" name="student_id" required><br><br>
+        
+        <label for="password">Password:</label><br>
+        <input type="password" id="password" name="password" required><br><br>
+        
+        <input type="submit" value="Login">
+    </form>
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+</body>
+</html>
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Attendance Dashboard</title>
+</head>
+<body>
+    <h1>Welcome, {{ name }}!</h1>
+    <h2>Attendance Summary</h2>
+    
+    <p><strong>Overall Percentage:</strong> {{ data.overall_percentage }}</p>
+    <p>Total Attended Hours: {{ data.total_attended_hours }}</p>
+    <p>Total Scheduled Hours: {{ data.total_scheduled_hours }}</p>
+
+    <h3>Class Breakdown</h3>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Class Name</th>
+                <th>Scheduled Hours</th>
+                <th>Attended Hours</th>
+                <th>Attendance %</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in data.breakdown %}
+            <tr>
+                <td>{{ record.class }}</td>
+                <td>{{ record.scheduled }}</td>
+                <td>{{ record.attended }}</td>
+                <td>{{ record.percentage }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <p><a href="/logout">Logout</a></p>
+</body>
+</html>

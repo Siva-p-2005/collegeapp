@@ -1,0 +1,116 @@
+from flask import Flask, render_template, request, redirect, url_for, session
+import sqlite3
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key' # IMPORTANT: Change this for production!
+
+# --- Database Setup (For demonstration) ---
+def init_db():
+    conn = sqlite3.connect('attendance.db')
+    c = conn.cursor()
+    # Create Students table (Simplified)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS students (
+            id TEXT PRIMARY KEY,
+            password TEXT NOT NULL,
+            name TEXT NOT NULL
+        )
+    ''')
+    # Create Attendance table (Simplified: one record per class/day)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS records (
+            student_id TEXT,
+            class_name TEXT,
+            scheduled_hours REAL,
+            attended_hours REAL
+        )
+    ''')
+    # Insert a sample student
+    c.execute("INSERT OR IGNORE INTO students (id, password, name) VALUES (?, ?, ?)", 
+              ('S1001', 'pass123', 'Alice Smith'))
+    # Insert sample attendance data for Alice (S1001)
+    c.execute("INSERT INTO records VALUES ('S1001', 'Math 101', 3.0, 2.5)")
+    c.execute("INSERT INTO records VALUES ('S1001', 'CS 202', 4.0, 4.0)")
+    
+    conn.commit()
+    conn.close()
+
+# --- Utility Function for Calculation ---
+def calculate_attendance(student_id):
+    conn = sqlite3.connect('attendance.db')
+    c = conn.cursor()
+    c.execute("SELECT class_name, scheduled_hours, attended_hours FROM records WHERE student_id=?", (student_id,))
+    records = c.fetchall()
+    conn.close()
+    
+    total_scheduled = sum(r[1] for r in records)
+    total_attended = sum(r[2] for r in records)
+    
+    # Calculate percentage and create a detailed breakdown
+    percentage = (total_attended / total_scheduled) * 100 if total_scheduled > 0 else 0
+    
+    breakdown = []
+    for class_name, scheduled, attended in records:
+        class_percentage = (attended / scheduled) * 100 if scheduled > 0 else 0
+        breakdown.append({
+            'class': class_name,
+            'scheduled': scheduled,
+            'attended': attended,
+            'percentage': f'{class_percentage:.2f}%'
+        })
+        
+    return {
+        'total_attended_hours': total_attended,
+        'total_scheduled_hours': total_scheduled,
+        'overall_percentage': f'{percentage:.2f}%',
+        'breakdown': breakdown
+    }
+
+# --- Flask Routes ---
+
+@app.route('/')
+def index():
+    # Redirect logged-in users to the dashboard
+    if 'student_id' in session:
+        return redirect(url_for('dashboard'))
+    return render_template('login.html')
+
+@app.route('/login', methods=['POST'])
+def login():
+    student_id = request.form['student_id']
+    password = request.form['password']
+
+    conn = sqlite3.connect('attendance.db')
+    c = conn.cursor()
+    c.execute("SELECT * FROM students WHERE id=? AND password=?", (student_id, password))
+    user = c.fetchone()
+    conn.close()
+
+    if user:
+        session['student_id'] = user[0] # Store student ID in session
+        session['student_name'] = user[2] # Store student name
+        return redirect(url_for('dashboard'))
+    else:
+        return render_template('login.html', error='Invalid ID or Password')
+
+@app.route('/dashboard')
+def dashboard():
+    if 'student_id' not in session:
+        return redirect(url_for('index')) # Redirect unauthenticated users
+        
+    student_id = session['student_id']
+    attendance_data = calculate_attendance(student_id)
+    
+    return render_template('dashboard.html', 
+                           name=session.get('student_name'),
+                           data=attendance_data)
+
+@app.route('/logout')
+def logout():
+    session.pop('student_id', None)
+    session.pop('student_name', None)
+    return redirect(url_for('index'))
+
+if __name__ == '__main__':
+    init_db() # Initialize the database on startup
+    app.run(debug=True)
